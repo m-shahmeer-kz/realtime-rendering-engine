@@ -1,0 +1,28 @@
+[build-system]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "fastchart"
+version = "1.0.0"
+description = "C++/OpenGL engine that draws millions of market data points in real time, with Python bindings."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Muhammad Shahmeer"}]
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.22", "pandas>=1.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "matplotlib>=3.6", "pillow>=9"]
+
+[tool.scikit-build]
+wheel.packages = ["python/fastchart"]
+cmake.build-type = "Release"
+
+[tool.scikit-build.cmake.define]
+FASTCHART_PYTHON = "ON"
+FASTCHART_APP = "OFF"
+FASTCHART_TESTS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

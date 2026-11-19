@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Real-Time Rendering Engine · 6.8 million Bitcoin prices</title>
+<style>
+:root{--bg:#060607;--card:#111113;--line:#26262b;--text:#f2f2f3;--mute:#8d8d95}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:36px 20px 70px}
+h1{font-size:clamp(28px,5vw,44px);line-height:1.05;margin:0 0 8px;letter-spacing:-.02em}
+.sub{color:var(--mute);max-width:760px;margin:0 0 22px}
+.chart{position:relative;background:#08080a;border:1px solid var(--line);border-radius:18px;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;cursor:grab}canvas:active{cursor:grabbing}
+.ax{position:absolute;font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mute);pointer-events:none;white-space:nowrap}
+.yl{right:8px;transform:translateY(-50%)}.xl{bottom:8px;transform:translateX(-50%)}
+.mode{position:absolute;left:12px;top:12px;font-size:12px;color:var(--mute);pointer-events:none}
+.load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+button{font:inherit;font-size:14px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 15px;cursor:pointer}
+button:hover{border-color:#55555c}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:4px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.st b{display:block;font-size:22px;letter-spacing:-.01em}.st span{color:var(--mute);font-size:12.5px}
+p.note{color:var(--mute);font-size:13px;margin-top:22px}a{color:var(--text)}
+</style></head><body><div class="wrap">
+<h1>Real-Time Rendering Engine</h1>
+<p class="sub">Every Bitcoin price on Bitstamp, one per minute from 2012 to 2025: <b>6,847,200 points</b>, drawn live by a C++ engine compiled to WebAssembly and rendered with WebGL 2.
+Scroll or pinch to zoom, drag to pan, double-click to reset.</p>
+<div class="chart" id="chart"><canvas id="c" tabindex="-1"></canvas><div class="mode" id="mode"></div><div id="axes"></div><div class="load" id="load">Loading 6.8 million prices…</div></div>
+<div class="bar">
+<button data-v="all">All 13 years</button><button data-v="2017-11-15,2018-02-15">2017 bull run</button>
+<button data-v="2020-03-08,2020-03-20">COVID crash</button><button data-v="2021-05-19T00:00,2021-05-20T00:00">One day</button>
+<button data-v="2021-05-19T12:00,2021-05-19T15:00">Three hours</button></div>
+<div class="stats">
+<div class="st"><b id="s-samples">–</b><span>prices in view</span></div>
+<div class="st"><b id="s-verts">–</b><span>points sent to the GPU</span></div>
+<div class="st"><b id="s-cpu">–</b><span>to build the view (C++)</span></div>
+<div class="st"><b id="s-fps">–</b><span>frames per second</span></div>
+<div class="st"><b id="s-mem">–</b><span>engine memory in your browser</span></div>
+</div>
+<p class="note">How it works: a min/max pyramid finds, for every pixel column, the first, last, lowest and highest price (the M4 method), so the GPU draws a few thousand points instead of millions, with the same picture.
+Zoom in far enough and it switches to candlesticks. Data: Zielak, "Bitcoin Historical Data", Kaggle (CC BY-SA 4.0), via <a href="https://github.com/ff137/bitstamp-btcusd-minute-data">ff137/bitstamp-btcusd-minute-data</a>.
+Code: <a href="https://github.com/m-shahmeer-kz/realtime-rendering-engine">GitHub</a>.</p>
+</div>
+<script src="fastchart.js"></script>
+<script>
+(async () => {
+  const canvas = document.getElementById('c'), box = document.getElementById('chart'), load = document.getElementById('load');
+  const M = await createFastchart({ canvas, locateFile: f => f, print: () => {}, printErr: () => {} });
+  const C = n => M.cwrap(n, 'number', []);
+  const api = { from: C('fc_view_from'), to: C('fc_view_to'), ymin: C('fc_ymin'), ymax: C('fc_ymax'), samples: C('fc_samples'),
+    verts: C('fc_vertices'), cpu: C('fc_cpu_ms'), frame: C('fc_frame_ms'), candles: C('fc_candles'), mem: C('fc_memory'),
+    setView: M.cwrap('fc_set_view', null, ['number', 'number']), setSize: M.cwrap('fc_set_size', null, ['number', 'number']) };
+  const size = () => { const w = box.clientWidth, h = Math.round(Math.min(520, Math.max(320, w * 0.5))); return [w, h]; };
+  let [w, h] = size(); canvas.width = w; canvas.height = h;
+  if (!M.ccall('fc_start', 'number', ['number', 'number'], [w, h])) { load.textContent = 'This browser does not support WebGL 2.'; return; }
+
+  // download + decompress + decode (zig-zag varint price changes in cents)
+  const res = await fetch('data/btc_close.bin.gz');
+  const total = +res.headers.get('content-length') || 7.8e6; let got = 0;
+  const counted = res.body.pipeThrough(new TransformStream({ transform(ch, c) { got += ch.length; load.textContent = `Loading 6.8 million prices… ${Math.min(99, Math.round(got / total * 100))}%`; c.enqueue(ch); } }));
+  const buf = new Uint8Array(await new Response(counted.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  const dv = new DataView(buf.buffer);
+  const n = dv.getUint32(4, true), t0 = dv.getFloat64(8, true), step = dv.getFloat64(16, true), scale = dv.getInt32(24, true);
+  const ptr = M._malloc(n * 4), prices = M.HEAP32.subarray(ptr >> 2, (ptr >> 2) + n);
+  let v = dv.getInt32(28, true), p = 32; prices[0] = v;
+  for (let i = 1; i < n; i++) {
+    let z = 0, s = 0, b;
+    do { b = buf[p++]; z += (b & 0x7f) * 2 ** s; s += 7; } while (b & 0x80);
+    v += (z % 2) ? -(z + 1) / 2 : z / 2; prices[i] = v;
+  }
+  M.ccall('fc_load', 'number', ['number', 'number', 'number', 'number', 'number'], [ptr, n, t0, step, scale]);
+  M._free(ptr); load.remove();
+
+  // axes, stats and presets
+  const axes = document.getElementById('axes'), mode = document.getElementById('mode');
+  const $ = id => document.getElementById(id), fmtN = x => x.toLocaleString('en-US');
+  const price = x => '$' + (Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en-US') : x.toFixed(2));
+  function date(t, span) { const d = new Date(t * 1000), iso = d.toISOString();
+    return span > 2 * 365 * 864e2 ? iso.slice(0, 7) : span > 3 * 864e2 ? iso.slice(0, 10) : iso.slice(5, 10) + ' ' + iso.slice(11, 16); }
+  let last = 0, frames = 0, fpsT = performance.now(), fps = 0;
+  function overlay(now) {
+    frames++; if (now - fpsT > 500) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
+    if (now - last > 80) { last = now;
+      const a = api.from(), b = api.to(), y0 = api.ymin(), y1 = api.ymax(); let html = '';
+      for (let k = 1; k < 5; k++) html += `<div class="ax yl" style="top:${h - h * k / 5}px">${price(y0 + (y1 - y0) * k / 5)}</div>`;
+      for (let k = 1; k < 5; k++) html += `<div class="ax xl" style="left:${w * k / 5}px">${date(a + (b - a) * k / 5, b - a)}</div>`;
+      axes.innerHTML = html;
+      mode.textContent = api.candles() ? 'Candlesticks (built from minute closes)' : 'Line (M4: 4 points per pixel column)';
+      $('s-samples').textContent = fmtN(api.samples()); $('s-verts').textContent = fmtN(api.verts());
+      const cms = api.cpu(); $('s-cpu').textContent = cms < 0.01 ? '< 0.01 ms' : cms.toFixed(2) + ' ms'; $('s-fps').textContent = Math.round(fps);
+      $('s-mem').textContent = (api.mem() / 1e6).toFixed(1) + ' MB'; }
+    requestAnimationFrame(overlay);
+  }
+  requestAnimationFrame(overlay);
+  const T = s => Date.parse(s.length <= 10 ? s + 'T00:00Z' : s + 'Z') / 1000;
+  document.querySelectorAll('button[data-v]').forEach(btn => btn.onclick = () => {
+    if (btn.dataset.v === 'all') api.setView(t0, t0 + n * step); else { const [a, b] = btn.dataset.v.split(','); api.setView(T(a), T(b)); } });
+  addEventListener('resize', () => { [w, h] = size(); api.setSize(w, h); });
+  const zoomAt = M.cwrap('fc_zoom_at', null, ['number', 'number']);
+  canvas.addEventListener('wheel', e => { e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 800 : e.deltaY;
+    zoomAt(Math.pow(1.0015, Math.max(-300, Math.min(300, dy))), e.clientX - canvas.getBoundingClientRect().left); }, { passive: false });
+  // touch: one finger pans, two fingers zoom
+  let touch = null;
+  const tx = e => [...e.touches].map(t => t.clientX - canvas.getBoundingClientRect().left);
+  canvas.addEventListener('touchstart', e => { touch = { x: tx(e), a: api.from(), b: api.to() }; e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { if (!touch) return; const x = tx(e), span = touch.b - touch.a; e.preventDefault();
+    if (x.length === 1 && touch.x.length === 1) { const dt = (x[0] - touch.x[0]) / w * span; api.setView(touch.a - dt, touch.b - dt); }
+    else if (x.length >= 2 && touch.x.length >= 2) { const d0 = Math.abs(touch.x[1] - touch.x[0]) || 1, d1 = Math.abs(x[1] - x[0]) || 1;
+      const mid = (touch.x[0] + touch.x[1]) / 2, tm = touch.a + span * mid / w, ns = span * d0 / d1;
+      api.setView(tm - ns * mid / w, tm - ns * mid / w + ns); } }, { passive: false });
+  canvas.addEventListener('touchend', e => { touch = e.touches.length ? { x: tx(e), a: api.from(), b: api.to() } : null; });
+})();
+</script></body></html>

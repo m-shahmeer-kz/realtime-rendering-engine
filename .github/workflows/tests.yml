@@ -1,0 +1,20 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries (OpenGL, GLFW, OSMesa)
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgl-dev libosmesa6-dev libgl1-mesa-dri
+      - name: Build C++ (engine, desktop app, tests)
+        run: cmake -S . -B build && cmake --build build -j 2
+      - name: C++ tests
+        run: ctest --test-dir build --output-on-failure
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and install the Python module
+        run: pip install ".[dev]"
+      - name: Python tests
+        run: cd /tmp && pytest -q $GITHUB_WORKSPACE/tests

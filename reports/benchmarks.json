@@ -1,0 +1,47 @@
+{
+  "machine": "x86_64, 2 CPU cores, no GPU (Mesa llvmpipe)",
+  "data": {
+    "rows": 6847200,
+    "first": 1325376060,
+    "last": 1736208000,
+    "step_seconds": 60,
+    "scale": 100,
+    "prices_exact_share": 0.999999890466176,
+    "max_price_error": 0.0011753699998371303
+  },
+  "memory": {
+    "pandas_bytes": 328665732,
+    "engine_bytes": 144247696,
+    "pyramid_bytes": 7303696,
+    "saving": 0.5611112386976809,
+    "bytes_per_row_pandas": 48.00001927795303,
+    "bytes_per_row_engine": 21.066669003388245
+  },
+  "view_build_1920px": {
+    "views": 401,
+    "median_ms": 0.052989,
+    "p95_ms": 0.696743,
+    "max_ms": 1.129354,
+    "full_range_ms": 1.129354,
+    "full_range_vertices": 7589,
+    "full_range_samples": 6847200,
+    "median_vertices_line_mode": 7490
+  },
+  "render_1280x720": {
+    "views": 30,
+    "m4_median_ms": 4.422351499954402,
+    "all_points_median_ms": 17.893869000033646,
+    "full_range_m4_ms": 4.547721999983878,
+    "full_range_all_ms": 391.9968579999704,
+    "speedup_median": 4.596647243834706,
+    "diff_pixels_median": 49.0,
+    "diff_pixels_max": 138,
+    "diff_share_of_image_max": 0.00014973958333333332,
+    "diff_share_of_line_pixels_median": 0.003068978026900802
+  },
+  "matplotlib_full_range": {
+    "matplotlib_ms": 415.6776529999888,
+    "fastchart_ms": 5.388605999996798,
+    "speedup": 77.14010877771278
+  }
+}

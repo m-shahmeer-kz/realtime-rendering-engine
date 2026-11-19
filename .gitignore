@@ -1,0 +1,11 @@
+build/
+build-*/
+data/*.csv.gz
+data/*.fcbin
+python/fastchart/*.so
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.DS_Store
